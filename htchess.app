@@ -1,0 +1,1 @@
+3D Hartwig Chess=||=htchess.icon.png=||=window.location.href='htchess.htm';
