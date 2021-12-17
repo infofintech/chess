@@ -1,0 +1,1 @@
+Chess=||=sys.chess.png=||=window.location.href='chess.htm';
