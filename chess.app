@@ -1,1 +1,1 @@
-Chess=||=sys.chess.png=||=window.location.href='chess.htm';
+Chess|[1]|sys.chess.png|[1]|window.location.href='chess.htm';
