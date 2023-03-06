@@ -1,1 +1,0 @@
-title|[>]|Chess|[1]|favicon|[>]|sys.chess.png|[1]|run|[>]|window.location.href='chess.htm';
