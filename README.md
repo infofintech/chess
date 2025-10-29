@@ -1,12 +1,5 @@
-3D Hartwig chess set 
-====================
+# Chess 3D
 
-3D chess game done in HTML/CSS/JS.
-Works only in webkit.
+A 3D chess game done in HTML/CSS/JS.
 
-See it in action : http://codepen.io/juliangarnier/full/BsIih
-
-**Libraries**
-
-* Photon : http://photon.attasi.com
-* Chess.js : https://github.com/jhlywa/chess.js
+"I can understand wanting to have millions of dollars, there’s a certain freedom, meaningful freedom, that comes with that. But once you get much beyond that, I have to tell you, it’s the same hamburger." - Bill Gates
