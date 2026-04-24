@@ -2,6 +2,7 @@
 <html lang="en-us">
   <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Chess3D</title>
     <link rel="shortcut icon" href="chess.icon.png">
     <link rel="stylesheet" href="chess.style.css">
@@ -50,7 +51,8 @@
 
       window.addEventListener('load', resizeCanvas);
       window.addEventListener('resize', resizeCanvas);
-
+      window.addEventListener('orientationchange', resizeCanvas);
+      
       loadingBar.style.display = "block";
       var script = document.createElement("script");
       script.src = loaderUrl;
