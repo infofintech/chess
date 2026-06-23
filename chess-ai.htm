@@ -1,0 +1,384 @@
+<!--
+
+Chess Html
+
+Copyright (C) 2025 - Fatih (https://github.com/99fk)
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8">
+  <title>Chess</title>
+  <link rel="shortcut icon" href="chess.icon.png">
+  <link rel="stylesheet" href="chess.style.css">
+</head>
+<body>
+  <div id="chessboard"></div>
+<div class="row">
+  <div>
+  <div id="volume-control">
+    🔊 Volume: <input type="range" min="0" max="1" step="0.05" value="0.5" id="volumeSlider">
+  </div>
+  </div>
+  <div>
+  <p id="status"> </p>
+  </div>
+  <div>
+    Difficulty:
+  <select id="difficulty" title="AI difficulty">
+    <option value="4">Beginner</option>
+    <option value="6">Easy</option>
+    <option value="10" selected>Medium</option>
+    <option value="15">Strong</option>
+    <option value="20">Expert</option>
+    <option value="25">Maximum</option>
+  </select>
+  </div>
+</div>
+  <script>
+    
+    const stockfish = new Worker("./stockfish.js");
+    const output = document.getElementById("status");
+	let aiThinking = false;
+	
+stockfish.onmessage = function(event) {
+  const line = event.data;
+  console.log(line);
+
+  // Zeige es im Status
+  //status.textContent = line;
+
+  if (line.startsWith("bestmove")) {
+    const move = line.split(" ")[1];
+    console.log("💡 Stockfish move:", move);
+    
+    makeAIMove(move); // ← Jetzt wird der Zug gespielt!
+  }
+};
+
+ 
+  function generateFEN() {
+  let fen = "";
+  for (let y = 0; y < 8; y++) {
+    let empty = 0;
+    for (let x = 0; x < 8; x++) {
+      const piece = board[y][x];
+      if (piece === " ") {
+        empty++;
+      } else {
+        if (empty > 0) { fen += empty; empty = 0; }
+        fen += piece;
+      }
+    }
+    if (empty > 0) fen += empty;
+    if (y !== 7) fen += "/";
+  }
+  fen += whiteTurn ? " w" : " b";
+  fen += " - - 0 1";
+  return fen;
+}
+
+function askStockfish() {
+  const fen = generateFEN();
+  const depth = document.getElementById("difficulty").value;
+  aiThinking = true;
+  stockfish.postMessage("position fen " + fen);
+  stockfish.postMessage("go depth " + depth);
+}
+
+function makeAIMove(uci) {
+  const fx = uci.charCodeAt(0) - 97;
+  const fy = 8 - parseInt(uci[1]);
+  const tx = uci.charCodeAt(2) - 97;
+  const ty = 8 - parseInt(uci[3]);
+
+  const piece = board[fy][fx];
+  const target = board[ty][tx];
+
+  board[ty][tx] = piece;
+  board[fy][fx] = " ";
+
+  // Umwandlung
+  if (uci.length === 5) {
+    const promo = uci[4];
+    board[ty][tx] = whiteTurn ? promo.toUpperCase() : promo.toLowerCase();
+  }
+
+  if (piece.toLowerCase() === "k") moved[(whiteTurn ? "w" : "b") + "k"] = true;
+  if (piece.toLowerCase() === "r") {
+    if (fx === 0) moved[(whiteTurn ? "w" : "b") + "ra"] = true;
+    if (fx === 7) moved[(whiteTurn ? "w" : "b") + "rh"] = true;
+  }
+
+  playSound(target !== " " ? "capture" : "move");
+  whiteTurn = !whiteTurn;
+  renderBoard();
+
+  // Wenn jetzt wieder Schwarz dran ist (KI spielt gegen sich?), weiter
+  if (!whiteTurn) askStockfish();
+}
+
+
+    const pieces = {
+      r: "♜", n: "♞", b: "♝", q: "♛", k: "♚", p: "♟",
+      R: "♖", N: "♘", B: "♗", Q: "♕", K: "♔", P: "♙"
+    };
+	let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    let volume = 0.5;
+    let board = [
+      "rnbqkbnr".split(""), "pppppppp".split(""),
+      " ".repeat(8).split(""), " ".repeat(8).split(""),
+      " ".repeat(8).split(""), " ".repeat(8).split(""),
+      "PPPPPPPP".split(""), "RNBQKBNR".split("")
+    ];
+
+    let moved = {}; // merkt sich, ob König oder Turm bewegt wurden
+    const chessboard = document.getElementById("chessboard");
+    const status = document.getElementById("status");
+    let selected = null;
+    let whiteTurn = true;
+
+    function renderBoard() {
+      chessboard.innerHTML = "";
+      for (let y = 0; y < 8; y++) {
+        for (let x = 0; x < 8; x++) {
+          const square = document.createElement("div");
+          square.className = "square " + ((x + y) % 2 === 0 ? "white" : "black");
+          square.dataset.x = x;
+          square.dataset.y = y;
+          const piece = board[y][x];
+          if (piece !== " ") {
+            const span = document.createElement("span");
+            span.textContent = pieces[piece];
+            span.className = (piece === piece.toUpperCase()) ? "white-piece" : "black-piece";
+            square.appendChild(span);
+          }
+          if (selected && selected.x == x && selected.y == y) square.classList.add("highlight");
+          square.onclick = () => handleClick(x, y);
+          chessboard.appendChild(square);
+        }
+      }
+      const inCheck = isCheck(whiteTurn);
+      const moves = allLegalMoves(whiteTurn);
+      if (inCheck && moves.length === 0) {
+        status.textContent = (whiteTurn ? "White" : "Black (Stockfish)") + " is checkmated!";
+      } else if (!inCheck && moves.length === 0) {
+        status.textContent = "Patt!";
+      } else if (inCheck) {
+        status.textContent = (whiteTurn ? "White" : "Black (Stockfish)") + " is in check!";
+      } else {
+        status.textContent = (whiteTurn ? "White" : "Black (Stockfish)") + " to move.";
+      }
+    }
+
+    function isWhite(p) { return p === p.toUpperCase(); }
+
+    function isLegalMove(fromX, fromY, toX, toY) {
+      const p = board[fromY][fromX];
+      const target = board[toY][toX];
+      const dx = toX - fromX, dy = toY - fromY;
+      const absDx = Math.abs(dx), absDy = Math.abs(dy);
+      if (!p || (target !== " " && isWhite(p) === isWhite(target))) return false;
+      const dir = isWhite(p) ? -1 : 1;
+      const startRow = isWhite(p) ? 6 : 1;
+
+      switch (p.toLowerCase()) {
+        case "p":
+          if (dx === 0 && target === " ") {
+            if (dy === dir) return true;
+            if (fromY === startRow && dy === 2 * dir && board[fromY + dir][fromX] === " ") return true;
+          }
+          if (absDx === 1 && dy === dir && target !== " " && isWhite(p) !== isWhite(target)) return true;
+          return false;
+        case "r":
+          if (dx && dy) return false;
+          return pathClear(fromX, fromY, toX, toY);
+        case "n":
+          return (absDx === 2 && absDy === 1) || (absDx === 1 && absDy === 2);
+        case "b":
+          if (absDx !== absDy) return false;
+          return pathClear(fromX, fromY, toX, toY);
+        case "q":
+          if (dx === 0 || dy === 0 || absDx === absDy) return pathClear(fromX, fromY, toX, toY);
+          return false;
+        case "k":
+          if (absDx <= 1 && absDy <= 1) return true;
+          // Rochade
+          if (dy === 0 && (dx === 2 || dx === -2)) {
+            const row = fromY;
+            const side = dx === 2 ? "king" : "queen";
+            return canCastle(row, side);
+          }
+          return false;
+      }
+      return false;
+    }
+
+    function canCastle(row, side) {
+      const color = row === 7 ? "w" : "b";
+      if (moved[color + "k"]) return false;
+      const y = row;
+      if (side === "king") {
+        if (moved[color + "rh"]) return false;
+        if (board[y][5] !== " " || board[y][6] !== " ") return false;
+      } else {
+        if (moved[color + "ra"]) return false;
+        if (board[y][1] !== " " || board[y][2] !== " " || board[y][3] !== " ") return false;
+      }
+      return true;
+    }
+
+    function pathClear(fromX, fromY, toX, toY) {
+      const dx = Math.sign(toX - fromX), dy = Math.sign(toY - fromY);
+      let x = fromX + dx, y = fromY + dy;
+      while (x !== toX || y !== toY) {
+        if (board[y][x] !== " ") return false;
+        x += dx; y += dy;
+      }
+      return true;
+    }
+
+    function isCheck(white) {
+      const k = white ? "K" : "k";
+      let kingX = -1, kingY = -1;
+      for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++)
+        if (board[y][x] === k) { kingX = x; kingY = y; }
+      for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) {
+        const p = board[y][x];
+        if (p !== " " && isWhite(p) !== white && isLegalMove(x, y, kingX, kingY)) return true;
+      }
+      return false;
+    }
+
+    function allLegalMoves(forWhite) {
+      const moves = [];
+      for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) {
+        const p = board[y][x];
+        if (p !== " " && isWhite(p) === forWhite) {
+          for (let yy = 0; yy < 8; yy++) for (let xx = 0; xx < 8; xx++) {
+            if (isLegalMove(x, y, xx, yy)) {
+              const save = board.map(r => [...r]);
+              const m = { ...moved };
+              board[yy][xx] = p; board[y][x] = " ";
+              if (!isCheck(forWhite)) moves.push([x, y, xx, yy]);
+              board = save; moved = m;
+            }
+          }
+        }
+      }
+      return moves;
+    }
+
+    function handleClick(x, y) {
+      if (!whiteTurn && aiThinking) return; 
+      const p = board[y][x];
+      if (selected) {
+        const fx = selected.x, fy = selected.y;
+        const piece = board[fy][fx];
+        if (isWhite(piece) !== whiteTurn) {
+          selected = null;
+} else if (isLegalMove(fx, fy, x, y)) {
+  const target = board[y][x]; // <-- NEU
+  const oldBoard = board.map(r => [...r]);
+  const oldMoved = { ...moved };
+  board[y][x] = piece;
+  board[fy][fx] = " ";
+
+  if (target !== " ") {
+    playSound("capture"); // <-- NEU
+  } else {
+    playSound("move");    // <-- NEU
+  }
+          // Rochade
+          if (piece.toLowerCase() === "k" && Math.abs(x - fx) === 2) {
+            const row = fy;
+            if (x > fx) { board[row][5] = board[row][7]; board[row][7] = " "; }
+            else { board[row][3] = board[row][0]; board[row][0] = " "; }
+          }
+          // Umwandlung
+          if (piece.toLowerCase() === "p" && (y === 0 || y === 7)) {
+            board[y][x] = isWhite(piece) ? "Q" : "q";
+          }
+          // Zug speichern
+          if (piece.toLowerCase() === "k") moved[(whiteTurn ? "w" : "b") + "k"] = true;
+          if (piece.toLowerCase() === "r") {
+            if (fx === 0) moved[(whiteTurn ? "w" : "b") + "ra"] = true;
+            if (fx === 7) moved[(whiteTurn ? "w" : "b") + "rh"] = true;
+          }
+          if (!isCheck(whiteTurn)) whiteTurn = !whiteTurn;
+          else { board = oldBoard; moved = oldMoved; }
+          selected = null;
+        } else selected = null;
+      } else if (p !== " " && isWhite(p) === whiteTurn) {
+        selected = { x, y };
+      }
+      renderBoard();
+      if (!whiteTurn) {
+  askStockfish();
+}
+    }
+
+    renderBoard();
+
+function playSound(type) {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  gain.gain.value = volume;
+  if (type === "move") osc.frequency.value = 440;
+  if (type === "capture") osc.frequency.value = 220;
+  if (type === "check") osc.frequency.value = 660;
+  osc.type = "square";
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.1);
+}
+
+document.getElementById("volumeSlider").addEventListener("input", e => {
+  volume = parseFloat(e.target.value);
+});
+
+
+function resizeBoard() {
+  const board = document.getElementById("chessboard");
+
+  const rect = board.getBoundingClientRect();
+  const sliderBox = document.getElementById("volume-control");
+  const df = document.getElementById("difficulty");
+  const st = document.getElementById("status");
+  sliderBox.style.left = rect.left + "px";
+  sliderBox.style.top = (rect.bottom + window.scrollY + 10) + "px"; 
+  const p = rect.bottom + window.scrollY + 10
+  st.style.top = p + "px"; 
+  df.style.top = p + "px"; 
+}
+
+window.addEventListener("resize", resizeBoard);
+window.addEventListener("load", resizeBoard);
+
+</script>
+
+<script>document.addEventListener("contextmenu",function(e){e.preventDefault();});</script>
+
+
+
+
+</body>
+</html>
+
